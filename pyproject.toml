@@ -1,0 +1,102 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "db-lens"
+version = "0.7.1"
+description = "Browse, inspect and safely query SQL databases (SQLite, PostgreSQL, MySQL/MariaDB, Oracle) from the terminal."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "db-lens contributors" }]
+keywords = ["database", "sql", "cli", "schema", "introspection", "sqlite", "postgresql", "mysql", "mariadb", "oracle"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Programming Language :: Python :: 3",
+    "Topic :: Database",
+    "Typing :: Typed",
+]
+# Bounds: lower = oldest version the suite was run against; upper = next major (next minor for SQLAlchemy). See README.
+dependencies = [
+    "typer>=0.16.0,<1",
+    "click>=8.2.1,<9",
+    "rich>=13.7,<16",
+    "sqlalchemy>=2.0.30,<2.2",
+    "sqlglot>=25.0,<31",
+]
+
+[project.optional-dependencies]
+secure = ["keyring>=24.0,<26"]
+postgres = ["psycopg2-binary>=2.9.9,<3"]
+mysql = ["pymysql>=1.1.0,<2"]
+mysqlclient = ["mysqlclient>=2.2.0,<3"]            # needs libmariadb-dev / libmysqlclient-dev + a compiler
+mysql-connector = ["mysql-connector-python>=9.5.0,<27"]
+oracle = ["oracledb>=2.0.0,<27"]
+ssh = ["paramiko>=3.4,<6"]
+gui = ["sv-ttk>=2.5,<4", "paramiko>=3.4,<6", "keyring>=24.0,<26"]
+# every driver that installs from wheels (mysqlclient excluded on purpose)
+drivers = [
+    "psycopg2-binary>=2.9.9,<3",
+    "pymysql>=1.1.0,<2",
+    "mysql-connector-python>=9.5.0,<27",
+    "oracledb>=2.0.0,<27",
+    "keyring>=24.0,<26",
+]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.1",
+    "mypy==2.4.0",
+    "build==1.6.1",
+    "twine==7.0.0",
+    "pyyaml==6.0.3",
+    "keyring>=24.0,<26",
+    "pymysql>=1.1.0,<2",
+    "mysql-connector-python>=9.5.0,<27",
+]
+
+[project.scripts]
+db-lens = "db_lens.cli:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["db_lens"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+addopts = "--cov --cov-report=term-missing --cov-fail-under=98.5 -m 'not live'"
+markers = ["live: needs real servers (DBLENS_PG_URL, DBLENS_MYSQL_URL, DBLENS_SSH_HOST/KEY); deselected by default, run with: pytest -m live --no-cov"]
+
+[tool.coverage.run]
+source = ["db_lens"]
+
+[tool.ruff]
+line-length = 150
+target-version = "py310"
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E731", "UP007", "UP045", "B905"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"scripts/*" = ["E501", "E702"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["db_lens", "tests", "scripts"]
+strict = true
+warn_unreachable = true
+pretty = false
+
+[[tool.mypy.overrides]]
+module = ["yaml", "paramiko", "paramiko.*", "sv_ttk", "keyring", "keyring.*", "MySQLdb", "MySQLdb.*", "mysql.*", "pymysql", "pymysql.*", "oracledb", "psycopg2", "psycopg2.*"]
+ignore_missing_imports = true

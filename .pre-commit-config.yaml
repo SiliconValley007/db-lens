@@ -1,0 +1,22 @@
+# Revisions match the exact tool versions in pyproject.toml (dev extra) and requirements-dev.txt.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.0
+    hooks:
+      - id: mypy
+        args: []
+        additional_dependencies: [pytest==9.1.1, "typer>=0.16.0,<1", "click>=8.2.1,<9", "rich>=13.7,<16", "sqlalchemy>=2.0.30,<2.2", "sqlglot>=25.0,<31"]
+        pass_filenames: false
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files

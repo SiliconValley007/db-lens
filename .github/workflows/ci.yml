@@ -1,0 +1,134 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "${{ matrix.python }}", cache: pip, cache-dependency-path: pyproject.toml }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb python3-tk   # GUI widget tests (a private Xvfb is started when DISPLAY is unset)
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy --strict db_lens tests scripts
+      - run: pytest -q                             # unit + mock suites (live tests are deselected); coverage >= 98.5 %; 0 skipped; warnings are errors
+      - run: coverage json -o coverage.json && python scripts/coverage_gate.py   # every module >= 96 %
+      - run: python scripts/release_check.py
+      - run: python scripts/smoke_test.py
+
+  unit-windows:
+    runs-on: windows-latest   # the platform TESTING.md targets; POSIX-only branches are excluded from coverage (pragma) and their tests skip
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash   # one shell everywhere: `&&` stops at the first failure and paths use forward slashes
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "${{ matrix.python }}", cache: pip, cache-dependency-path: pyproject.toml }
+      - run: pip install -e ".[dev]"
+      - run: ruff check . && ruff format --check .
+      - run: mypy --strict db_lens tests scripts
+      - run: pytest -q -rs                         # same gates as Linux: 0 skipped (OS branches are tested through monkeypatched helpers)
+      - run: coverage json -o coverage.json && python scripts/coverage_gate.py
+      - run: python scripts/release_check.py
+      - run: python scripts/smoke_test.py
+
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: python scripts/smoke_test.py --with-keyring --report smoke.md
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: windows-smoke-report, path: smoke.md }
+
+  os-symmetry:        # the other platform's helper branches, executed on Linux: the whole suite with Windows and with POSIX defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        simulate: [windows, posix]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: pyproject.toml }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb python3-tk
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+        env: { DBLENS_SIMULATE_OS: "${{ matrix.simulate }}" }
+      - run: coverage json -o coverage.json && python scripts/coverage_gate.py
+
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - run: python scripts/release_check.py "v$(python -c 'import db_lens; print(db_lens.__version__)')" --dist dist
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pw }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready" --health-interval 5s --health-timeout 5s --health-retries 10
+      mariadb:
+        image: mariadb:10.11
+        env: { MARIADB_ROOT_PASSWORD: pw, MARIADB_DATABASE: lens }
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DBLENS_PG_URL: postgresql+psycopg2://postgres:pw@127.0.0.1:5432/postgres
+      DBLENS_MYSQL_URL: mysql+pymysql://root:pw@127.0.0.1:3306/lens
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - run: sudo apt-get update && sudo apt-get install -y libmariadb-dev pkg-config gcc
+      - run: pip install -e ".[dev,drivers,mysqlclient]"
+      - run: pytest -m live -q -rs --no-cov        # tests/test_integration.py against the live services above

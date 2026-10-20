@@ -1,0 +1,137 @@
+name: Release
+# Tag a version (git tag v0.7.1 && git push --tags) to build, test the built wheel on three operating systems, publish to PyPI and
+# create a GitHub release. One-time setup on pypi.org: add a *trusted publisher* (Account → Publishing) for this repository, workflow
+# "release.yml", environment "pypi" (no API token is stored anywhere). Run the workflow by hand with "testpypi" to rehearse on test.pypi.org.
+# Every job declares its own least-privilege permissions; the build is attested (SLSA provenance) and PyPI receives PEP 740 attestations.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish (the tag check is skipped for manual runs)"
+        type: choice
+        options: [none, testpypi]
+        default: none
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false      # never cancel a release half-way
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  validate:         # exactly the CI gates (scripts/release_check.py asserts ci.yml and release.yml both run every one) before anything is built or published
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: pyproject.toml }
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb python3-tk
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy --strict db_lens tests scripts
+      - run: pytest -q
+      - run: coverage json -o coverage.json && python scripts/coverage_gate.py
+      - run: python scripts/release_check.py
+      - run: python scripts/smoke_test.py
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write            # provenance attestation (tags only)
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "3.12" }
+      - run: pip install build==1.6.1 twine==7.0.0 pyyaml==6.0.3
+      - name: Tag, pyproject, __version__ and CHANGELOG agree
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python scripts/release_check.py "$GITHUB_REF_NAME"
+      - run: python -m build
+      - run: twine check --strict dist/*
+      - name: Artifacts carry the tagged version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python scripts/release_check.py "$GITHUB_REF_NAME" --dist dist
+      - name: Attest build provenance
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with: { subject-path: "dist/*" }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: dist, path: dist/, if-no-files-found: error }
+
+  test-wheel:        # the *built* wheel, on the platforms users have, not the source tree
+    needs: build
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with: { python-version: "${{ matrix.python }}" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: dist, path: dist }
+      - shell: bash
+        run: pip install dist/*.whl
+      - shell: bash
+        working-directory: ${{ runner.temp }}      # outside the checkout, so the installed wheel (not ./db_lens) is imported
+        run: |
+          db-lens --version
+          python "$GITHUB_WORKSPACE/scripts/smoke_test.py"
+
+  publish-testpypi:
+    needs: test-wheel
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testpypi
+    permissions: { id-token: write }
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with: { repository-url: "https://test.pypi.org/legacy/", attestations: true }
+
+  publish-pypi:
+    needs: test-wheel
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions: { id-token: write }    # trusted publishing: no stored token
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: dist, path: dist }
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with: { attestations: true }
+
+  github-release:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: dist, path: dist }
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with: { files: dist/*, generate_release_notes: true, fail_on_unmatched_files: true }

@@ -1,0 +1,25 @@
+# db-lens runtime requirements. Ranges: lower bound = oldest version the test-suite was run against,
+# upper bound = next major (or next minor for fast-moving libraries). See README "Verification".
+# Install the package itself with:  pip install .      (extras: secure, postgres, mysql, mysqlclient, mysql-connector, oracle, ssh, gui, drivers)
+
+# --- core ---
+typer>=0.16.0,<1
+click>=8.2.1,<9
+rich>=13.7,<16
+sqlalchemy>=2.0.30,<2.2
+sqlglot>=25.0,<31
+
+# --- database drivers (pure-Python or binary wheels; install the ones you need) ---
+psycopg2-binary>=2.9.9,<3          # PostgreSQL            (live-tested)
+pymysql>=1.1.0,<2                  # MySQL / MariaDB       (live-tested on MariaDB)
+mysql-connector-python>=9.5.0,<27  # MySQL / MariaDB       (live-tested on MariaDB; streams only with SQLAlchemy >= 2.1)
+oracledb>=2.0.0,<27                # Oracle (thin mode)    (MOCK-TESTED ONLY: no live Oracle server was available)
+
+# --- credential storage (optional; falls back to ${ENV} / 0600 file without it) ---
+keyring>=24.0,<26
+
+# --- optional GUI widgets (db_lens.gui): sv-ttk theme; Tk itself ships with Python (Linux: python3-tk) ---
+# sv-ttk>=2.5,<4
+
+# --- optional, needs system libraries and a compiler (apt: libmariadb-dev pkg-config gcc; brew: mysql-client pkg-config) ---
+# mysqlclient>=2.2.0,<3            # MySQL / MariaDB       (live-tested on MariaDB)

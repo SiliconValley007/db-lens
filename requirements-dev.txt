@@ -1,0 +1,21 @@
+# Development / test requirements: tool versions are EXACT and identical to [project.optional-dependencies].dev in pyproject.toml
+# and to the hook revisions in .pre-commit-config.yaml (scripts/release_check.py fails when they drift).
+-r requirements.txt
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.17.1
+mypy==2.4.0
+build==1.6.1
+pyyaml==6.0.3         # scripts/release_check.py validates the workflow / pre-commit YAML
+twine==7.0.0         # twine 6.x rejects the Metadata-Version 2.5 that current hatchling emits
+
+# Offline mock tests import these drivers (no server needed):
+pymysql>=1.1.0,<2
+mysql-connector-python>=9.5.0,<27
+
+# GUI widget tests need Tk and a display. Linux: apt-get install -y python3-tk xvfb (tests start a private Xvfb when DISPLAY is unset).
+# Full live-driver matrix also needs mysqlclient, which compiles against the MariaDB/MySQL client library:
+#   Debian/Ubuntu:  sudo apt-get install -y libmariadb-dev pkg-config gcc
+#   macOS:          brew install mysql-client pkg-config
+# then:  pip install "mysqlclient>=2.2.0,<3"
+# Live-server tests are deselected by default (marker "live"):  DBLENS_PG_URL=... DBLENS_MYSQL_URL=... pytest -m live --no-cov
