@@ -1,8 +1,8 @@
 from __future__ import annotations
-import re
 
 import gc
 import os
+import re
 import shutil
 import sqlite3
 import subprocess

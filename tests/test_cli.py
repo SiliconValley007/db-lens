@@ -419,7 +419,9 @@ def test_shell_completion_end_to_end(home: Path, dbfile: Path, runner: Any) -> N
         "_DB_LENS_COMPLETE": "complete_bash",
         "COMP_WORDS": "db-lens profiles use al",
         "COMP_CWORD": "3",
-        "PYTHONUTF8": "1", "NO_COLOR": "1", "_TYPER_FORCE_DISABLE_TERMINAL": "1",
+        "PYTHONUTF8": "1",
+        "NO_COLOR": "1",
+        "_TYPER_FORCE_DISABLE_TERMINAL": "1",
     }
     p = subprocess.run([sys.executable, "-m", "db_lens"], env=env, capture_output=True, text=True, encoding="utf-8")
     assert "alpha" in p.stdout and "beta" not in p.stdout, p.stdout + p.stderr
