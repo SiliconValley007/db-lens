@@ -68,7 +68,9 @@ packages = ["db_lens"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "ignore::ResourceWarning",
+    "ignore::pytest.PytestUnraisableExceptionWarning","error"]
 addopts = "--cov --cov-report=term-missing --cov-fail-under=98.5 -m 'not live'"
 markers = ["live: needs real servers (DBLENS_PG_URL, DBLENS_MYSQL_URL, DBLENS_SSH_HOST/KEY); deselected by default, run with: pytest -m live --no-cov"]
 

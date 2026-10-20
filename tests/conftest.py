@@ -1,3 +1,4 @@
+import re
 from __future__ import annotations
 
 import gc
@@ -87,7 +88,7 @@ class Runner:
         assert x.exit_code == code, (args, x.output)
         assert "Traceback" not in x.output, x.output  # failures must be panels, never stack traces
         for h in [has] if isinstance(has, str) else has:
-            assert h in x.output, (args, h, x.output)
+            assert h in re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", x.output), (args, h, x.output)
         for h in [hasnt] if isinstance(hasnt, str) else hasnt:
             assert h not in x.output, (args, h, x.output)
         self.last = x
