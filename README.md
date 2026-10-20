@@ -195,7 +195,7 @@ Live tests are deselected by default (marker `live`); with `-m live` the ones wh
 ## Desktop window: `db-lens gui`
 
 ```
-pip install "db-lens[gui]"        # adds the sv-ttk theme; Tk itself ships with Python (Linux: apt install python3-tk)
+pip install ".[gui]"       # from a clone of the repo
 db-lens gui                       # opens on the default profile
 db-lens gui -p shop               # or a saved profile
 ```
