@@ -1,5 +1,5 @@
-import re
 from __future__ import annotations
+import re
 
 import gc
 import os
