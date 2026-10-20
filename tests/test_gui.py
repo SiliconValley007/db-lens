@@ -209,7 +209,8 @@ def test_grid_chunked_rendering_is_incremental_and_cancellable(frame: tk.Frame, 
     g = make_grid(frame, on_rendered=done.append)
     g.set_data(["n"], [[i] for i in range(7)])
     assert g.rendering and len(g.tree.get_children()) == 2
-    for _ in range(20): pump(frame, g)
+    for _ in range(20):
+        pump(frame, g)
     assert not peek(g, "rendering") and len(g.tree.get_children()) == 7 and done == [7]
     g.set_data(["n"], [[i] for i in range(7)])  # a new load supersedes a half-finished one
     g.clear()
