@@ -1,6 +1,8 @@
 import csv
 import io
 import json
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +18,8 @@ def test_connect_profiles_and_default_switching(home: Path, dbfile: Path, runner
     other = tmp_path / "other.db"
     import sqlite3
 
-    sqlite3.connect(other).executescript("CREATE TABLE only_here(x INT);")
+    with closing(sqlite3.connect(other)) as c:
+        c.executescript("CREATE TABLE only_here(x INT);")
     runner("connect", f"sqlite:///{other}", "-n", "b")
     runner("tables", has="only_here", hasnt="users")  # b is now default
     runner("tables", "-p", "a", has="users", hasnt="only_here")  # explicit profile wins
@@ -368,10 +371,10 @@ def test_tables_json_and_csv(prof: Path, runner: Any) -> None:
 
 
 def test_tables_csv_neutralises_formula_table_names(home: Path, tmp_path: Path, runner: Any) -> None:
-    import sqlite3
 
     p = tmp_path / "f.db"
-    sqlite3.connect(p).executescript('CREATE TABLE "=cmd|x"(a int); CREATE TABLE "@evil"(b int);')
+    with closing(sqlite3.connect(p)) as c:
+        c.executescript('CREATE TABLE "=cmd|x"(a int); CREATE TABLE "@evil"(b int);')
     runner("connect", f"sqlite:///{p}", "-n", "f")
     out = runner("tables", "-o", "csv")
     assert "'=cmd|x" in out and "'@evil" in out and "\r" not in out

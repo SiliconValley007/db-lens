@@ -30,7 +30,9 @@ def server_must_survive() -> Iterator[Any]:
 
     def mysql_state() -> Any:
         with db.engine(make_url(MY)) as e, e.connect() as c:
-            st: dict[str, Any] = dict(c.execute(text("SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Com_shutdown')")).all())
+            st: dict[str, Any] = {
+                str(r[0]): r[1] for r in c.execute(text("SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Com_shutdown')")).all()
+            }
             return int(st["Uptime"]), int(st.get("Com_shutdown", 0))
 
     def pg_state() -> Any:
