@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import json
 import os
 import tempfile
@@ -29,7 +28,7 @@ def export_rows(path: str | os.PathLike[str], fmt: str, columns: list[str], rows
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
             if fmt == "csv":
-                w = csv.writer(f, lineterminator="\n")
+                w = cli.csv_writer(f)
                 w.writerow([cli.csv_safe(c) for c in columns])
                 w.writerows([cli.csv_safe(v) for v in r] for r in rows)
             else:

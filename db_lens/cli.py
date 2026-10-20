@@ -7,13 +7,14 @@ the README; in short: SQLite/PostgreSQL/MariaDB are tested on live servers, Orac
 from __future__ import annotations
 
 import csv
+import io
 import json
 import logging
 import os
 import re
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager, nullcontext
 from enum import Enum
 from pathlib import Path
@@ -115,6 +116,26 @@ def clean(v: object) -> str:
 def csv_safe(v: object) -> object:
     """Neutralise spreadsheet formulas: text starting with = + - @ TAB CR gets a leading apostrophe. Numbers are untouched."""
     return "'" + v if isinstance(v, str) and v.startswith(_FORMULA) else v
+
+
+class _LfCsvWriter:
+    """CSV rows ending in a bare LF; a bare CR/LF inside a cell is still quoted."""
+
+    def __init__(self, stream: Any) -> None:
+        self._stream = stream
+
+    def writerow(self, row: Iterable[object]) -> None:
+        buf = io.StringIO()
+        csv.writer(buf, lineterminator="\r\n").writerow(row)
+        self._stream.write(buf.getvalue()[:-2] + "\n")
+
+    def writerows(self, rows: Iterable[Iterable[object]]) -> None:
+        for r in rows:
+            self.writerow(r)
+
+
+def csv_writer(stream: Any) -> _LfCsvWriter:
+    return _LfCsvWriter(stream)
 
 
 def warn(msg: object) -> None:
@@ -413,7 +434,7 @@ def emit_records(records: list[dict[str, Any]], fmt: Fmt, meta: str) -> None:
     if fmt is Fmt.json:
         typer.echo(json.dumps(records, default=str, indent=2))
     else:
-        w = csv.writer(sys.stdout, lineterminator="\n")
+        w = csv_writer(sys.stdout)
         cols = list(records[0]) if records else []
         w.writerow(cols)
         w.writerows([csv_safe(r[c]) for c in cols] for r in records)
@@ -662,7 +683,7 @@ def query(
         if fmt is Fmt.json:
             typer.echo(json.dumps([dict(zip(cols, r)) for r in rows], default=str, indent=2))
         elif fmt is Fmt.csv:
-            w, f = csv.writer(sys.stdout, lineterminator="\n"), (lambda v: v) if csv_raw else csv_safe  # \r\n would become \r\r\n on Windows
+            w, f = csv_writer(sys.stdout), (lambda v: v) if csv_raw else csv_safe  # \r\n would become \r\r\n on Windows
             w.writerow([f(c) for c in cols])  # aliases are attacker-controllable too
             w.writerows([f(v) for v in r] for r in rows)
         else:

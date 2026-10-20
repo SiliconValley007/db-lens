@@ -56,9 +56,9 @@ def test_after_runs_in_order_from_update_and_can_be_cancelled(tk: Any) -> None:
     root.after(10_000, ran.append, "far")  # not due: stays queued
     root.update()
     assert ran == ["a", "b"]
-    t0 = time.monotonic()
+    t0 = time.perf_counter()
     root.after(5)  # no callback: a plain sleep
-    assert time.monotonic() - t0 >= 0.004
+    assert time.perf_counter() - t0 >= 0.004
     tkstub._TIMERS.clear()
 
 
