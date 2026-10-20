@@ -429,7 +429,7 @@ def test_shell_completion_end_to_end(home: Path, dbfile: Path, runner: Any) -> N
     assert "beta" in subprocess.run([sys.executable, "-m", "db_lens"], env=env, capture_output=True, text=True, encoding="utf-8").stdout
     env["COMP_WORDS"], env["COMP_CWORD"] = "db-lens pro", "1"
     assert "profiles" in subprocess.run([sys.executable, "-m", "db_lens"], env=env, capture_output=True, text=True, encoding="utf-8").stdout
-    assert "--install-completion" in runner("--help")
+    runner("--help", has="--install-completion")  # has= strips ANSI codes first
 
 
 def test_ssh_flag_validation(home: Path, dbfile: Path, runner: Any) -> None:
