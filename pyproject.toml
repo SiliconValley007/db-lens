@@ -50,7 +50,7 @@ drivers = [
 dev = [
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
-    "ruff==0.17.1",
+    "ruff==0.17.2",
     "mypy==2.4.0",
     "build==1.6.1",
     "twine==7.0.0",
