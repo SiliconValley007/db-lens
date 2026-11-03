@@ -1,7 +1,7 @@
 # Development / test requirements: tool versions are EXACT and identical to [project.optional-dependencies].dev in pyproject.toml
 # and to the hook revisions in .pre-commit-config.yaml (scripts/release_check.py fails when they drift).
 -r requirements.txt
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 ruff==0.17.1
 mypy==2.4.0
