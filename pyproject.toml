@@ -54,7 +54,7 @@ dev = [
     "mypy==2.4.0",
     "build==1.6.1",
     "twine==7.0.0",
-    "pyyaml==6.0.3",
+    "pyyaml==6.0.4",
     "keyring>=24.0,<26",
     "pymysql>=1.1.0,<2",
     "mysql-connector-python>=9.5.0,<27",
